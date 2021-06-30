@@ -340,7 +340,7 @@ void DrawAnimation(HWND hWnd, HDC hdc)
 	bx = bitAni.bmWidth / 12;
 	by = bitAni.bmHeight / 4;
 
-	TransparentBlt(hdc, AniPos.x, AniPos.y, bx, by, hMemDC, xStart, yStart, bx, by, RGB(255, 0, 255));
+	TransparentBlt(hdc, AniPos.x, AniPos.y, bx, by, hMemDC, (curframe + xStart) * SPRITE_SIZE_X, yStart, bx, by, RGB(255, 0, 255));
 
 	SelectObject(hMemDC, hOldBitmap);
 
@@ -381,7 +381,7 @@ void DrawRectText(HDC hdc)
 void Update() {
 	DWORD newTime = GetTickCount();
 	static DWORD oldTime = newTime;
-	if (newTime - oldTime < 2) return;
+	if (newTime - oldTime < 100) return;
 	oldTime = newTime;
 
 	// : to do something
@@ -390,78 +390,61 @@ void Update() {
 
 void UpdateFrame() {
 	if (GetKeyState(VK_RIGHT) & 0x8000) {
-		AniPos.x += 1;
-		RUN_FRAME_MAX = 6;
-		RUN_FRAME_MIN = 0;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x += 10;
 		xStart = 0;
 		yStart = 2;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_LEFT) & 0x8000) {
-		AniPos.x -= 1;
-		RUN_FRAME_MAX = 6;
-		RUN_FRAME_MIN = 0;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x -= 10;
 		xStart = 0;
 		yStart = 1;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_UP) & 0x8000) {
-		AniPos.y -= 1;
-		RUN_FRAME_MAX = 6;
-		RUN_FRAME_MIN = 0;
-		curframe = RUN_FRAME_MIN;
+		AniPos.y -= 10;
 		xStart = 0;
 		yStart = 3;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_DOWN) & 0x8000) {
-		AniPos.y += 1;
-		RUN_FRAME_MAX = 6;
-		RUN_FRAME_MIN = 0;
-		curframe = RUN_FRAME_MIN;
+		AniPos.y += 10;
 		xStart = 0;
 		yStart = 0;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_RIGHT) & 0x8000) && (GetKeyState(VK_DOWN) & 0x8000))
 	{
-		AniPos.x += 1;
-		AniPos.y += 1;
-		RUN_FRAME_MAX = 12;
-		RUN_FRAME_MIN = 6;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x += 10;
+		AniPos.y += 10;
 		xStart = 6;
 		yStart = 0;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_LEFT) & 0x8000) && (GetKeyState(VK_DOWN) & 0x8000))
 	{
-		AniPos.x -= 1;
-		AniPos.y += 1;
-		RUN_FRAME_MAX = 12;
-		RUN_FRAME_MIN = 6;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x -= 10;
+		AniPos.y += 10;
 		xStart = 6;
 		yStart = 1;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_RIGHT) & 0x8000) && (GetKeyState(VK_UP) & 0x8000))
 	{
-		AniPos.x += 1;
-		AniPos.y -= 1;
-		RUN_FRAME_MAX = 12;
-		RUN_FRAME_MIN = 6;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x += 10;
+		AniPos.y -= 10;
 		xStart = 6;
 		yStart = 3;
+		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_LEFT) & 0x8000) && (GetKeyState(VK_UP) & 0x8000))
 	{
-		AniPos.x -= 1;
-		AniPos.y -= 1;
-		RUN_FRAME_MAX = 12;
-		RUN_FRAME_MIN = 6;
-		curframe = RUN_FRAME_MIN;
+		AniPos.x -= 10;
+		AniPos.y -= 10;
 		xStart = 6;
 		yStart = 2;
+		yStart *= SPRITE_SIZE_Y;
 	}
-	xStart *= SPRITE_SIZE_X;
-	yStart *= SPRITE_SIZE_Y;
+
 }
 
