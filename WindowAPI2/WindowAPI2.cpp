@@ -5,9 +5,12 @@
 #include "WindowAPI2.h"
 
 //c++ header
+#include <ObjIdl.h>
+#include <gdiplus.h>
+#pragma comment(lib, "Gdiplus.lib")
+using namespace Gdiplus;
 
-
-#pragma comment(lib,"msimg32.lib");
+#pragma comment(lib,"msimg32.lib")
 
 
 #define MAX_LOADSTRING 100
@@ -38,7 +41,8 @@ int RUN_FRAME_MIN = 0;
 int curframe = RUN_FRAME_MIN;
 RECT rectView;
 
-
+//double buffering
+HBITMAP hDoubleBufferImage;
 
 
 void CreateBitmap();
@@ -55,6 +59,17 @@ VOID CALLBACK AniProc(HWND hWnd, UINT uMsg,
 	UINT idEvent, DWORD dwTime);
 
 void DrawRectText(HDC hdc);
+
+//double buffering
+void DrawBitmapDoubleBuffering(HWND hWnd, HDC hdc);
+
+//GDI+
+ULONG_PTR g_GdiToken;
+
+void GDI_Init();
+void GDI_Draw(HDC hdc);
+void OnGDI_Paint(HDC hdc);
+void GDI_End();
 
 
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
@@ -97,6 +112,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	//    }
 	//}
 
+	GDI_Init();
+
 	while (true) {
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			if (msg.message == WM_QUIT) {
@@ -111,6 +128,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			Update();
 		}
 	}
+
+	GDI_End();
 
 	return (int)msg.wParam;
 }
@@ -193,7 +212,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		GetClientRect(hWnd, &rectView);
 		CreateBitmap();
 	//	SetTimer(hWnd, 123, 100, NULL);
-		SetTimer(hWnd, 123, 100, AniProc);
+		SetTimer(hWnd, 123, 1, AniProc);
 	}
 		break;
 	case WM_TIMER:
@@ -228,11 +247,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
-			DrawBitmap(hWnd, hdc);
+//			DrawBitmap(hWnd, hdc);
 //			DrawTransBitmap(hWnd, hdc);
-			DrawAnimation(hWnd, hdc);
+//			DrawAnimation(hWnd, hdc);
 //			DrawRectText(hdc);
-
+			DrawBitmapDoubleBuffering(hWnd, hdc);
 
 
             EndPaint(hWnd, &ps);
@@ -378,10 +397,88 @@ void DrawRectText(HDC hdc)
 	if (yPos > rectView.bottom) yPos = 0;
 }
 
+void DrawBitmapDoubleBuffering(HWND hWnd, HDC hdc)
+{
+	HDC hMemDC;
+	HBITMAP hOldBitmap;
+	int bx, by;
+
+	HDC hMemDC2;
+	HBITMAP hOldBitmap2;
+
+	hMemDC = CreateCompatibleDC(hdc);
+
+	if (!hMemDC)
+	{
+		MessageBox(hWnd, _T("CreateCompatibleDC failed")
+			, _T("Error"), MB_OK);
+		return;
+	}
+
+	if (hDoubleBufferImage == NULL)
+	{
+		hDoubleBufferImage = CreateCompatibleBitmap(hdc,
+			rectView.right, rectView.bottom);
+	}
+
+	hOldBitmap = (HBITMAP)SelectObject(hMemDC, hDoubleBufferImage);
+
+	// Back
+	{
+		hMemDC2 = CreateCompatibleDC(hMemDC);
+		hOldBitmap2 = (HBITMAP)SelectObject(hMemDC2, hBackImage);
+		bx = bitBack.bmWidth;
+		by = bitBack.bmHeight;
+
+		BitBlt(hMemDC, 0, 0, bx, by, hMemDC2, 0, 0, SRCCOPY);
+
+		SelectObject(hMemDC2, hOldBitmap2);
+		DeleteDC(hMemDC2);
+	}
+	//sigong
+	{
+		hMemDC2 = CreateCompatibleDC(hMemDC);
+		hOldBitmap2 = (HBITMAP)SelectObject(hMemDC2, hTransparentImage);
+		bx = bitTransparent.bmWidth;
+		by = bitTransparent.bmHeight;
+
+		BitBlt(hMemDC, 100, 200, bx, by, hMemDC2, 0, 0, SRCCOPY);
+		TransparentBlt(hMemDC, 200, 200, bx, by, hMemDC2, 0, 0,
+			bx, by, RGB(255, 0, 255));
+
+		SelectObject(hMemDC2, hOldBitmap2);
+		DeleteDC(hMemDC2);
+
+	}
+
+	//animation
+	{
+		hMemDC2 = CreateCompatibleDC(hMemDC);
+		hOldBitmap2 = (HBITMAP)SelectObject(hMemDC2, hAniImage);
+		bx = SPRITE_SIZE_X;
+		by = SPRITE_SIZE_Y;
+
+
+		TransparentBlt(hMemDC, AniPos.x, AniPos.y, bx * 3, by * 3, hMemDC2, (curframe + xStart) * bx, yStart * by, bx, by, RGB(255, 255, 255));
+
+		SelectObject(hMemDC2, hOldBitmap2);
+		DeleteDC(hMemDC2);
+	}
+	//GDI
+	GDI_Draw(hMemDC);
+
+
+	//
+	BitBlt(hdc, 0, 0, rectView.right, rectView.bottom,
+		hMemDC, 0, 0, SRCCOPY);
+	SelectObject(hMemDC, hOldBitmap);
+	DeleteDC(hMemDC);
+}
+
 void Update() {
 	DWORD newTime = GetTickCount();
 	static DWORD oldTime = newTime;
-	if (newTime - oldTime < 100) return;
+	if (newTime - oldTime < 2) return;
 	oldTime = newTime;
 
 	// : to do something
@@ -390,61 +487,165 @@ void Update() {
 
 void UpdateFrame() {
 	if (GetKeyState(VK_RIGHT) & 0x8000) {
-		AniPos.x += 10;
+		AniPos.x += 1;
 		xStart = 0;
 		yStart = 2;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_LEFT) & 0x8000) {
-		AniPos.x -= 10;
+		AniPos.x -= 1;
 		xStart = 0;
 		yStart = 1;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_UP) & 0x8000) {
-		AniPos.y -= 10;
+		AniPos.y -= 1;
 		xStart = 0;
 		yStart = 3;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if (GetKeyState(VK_DOWN) & 0x8000) {
-		AniPos.y += 10;
+		AniPos.y += 1;
 		xStart = 0;
 		yStart = 0;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_RIGHT) & 0x8000) && (GetKeyState(VK_DOWN) & 0x8000))
 	{
-		AniPos.x += 10;
-		AniPos.y += 10;
+		AniPos.x += 1;
+		AniPos.y += 1;
 		xStart = 6;
 		yStart = 0;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_LEFT) & 0x8000) && (GetKeyState(VK_DOWN) & 0x8000))
 	{
-		AniPos.x -= 10;
-		AniPos.y += 10;
+		AniPos.x -= 1;
+		AniPos.y += 1;
 		xStart = 6;
 		yStart = 1;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_RIGHT) & 0x8000) && (GetKeyState(VK_UP) & 0x8000))
 	{
-		AniPos.x += 10;
-		AniPos.y -= 10;
+		AniPos.x += 1;
+		AniPos.y -= 1;
 		xStart = 6;
 		yStart = 3;
-		yStart *= SPRITE_SIZE_Y;
 	}
 	if ((GetKeyState(VK_LEFT) & 0x8000) && (GetKeyState(VK_UP) & 0x8000))
 	{
-		AniPos.x -= 10;
-		AniPos.y -= 10;
+		AniPos.x -= 1;
+		AniPos.y -= 1;
 		xStart = 6;
 		yStart = 2;
-		yStart *= SPRITE_SIZE_Y;
 	}
 
 }
 
+
+void GDI_Init()
+{
+	GdiplusStartupInput gpsi;
+	GdiplusStartup(&g_GdiToken, &gpsi, NULL);
+}
+void GDI_Draw(HDC hdc)
+{
+	OnGDI_Paint(hdc);
+}
+void OnGDI_Paint(HDC hdc)
+{
+	Graphics graphics(hdc);
+
+	// text
+	SolidBrush brush(Color(255, 255, 0, 0));
+	FontFamily fontFamily(L"Times New Roman");
+	Font font(&fontFamily, 24, FontStyleRegular, UnitPixel);
+	PointF pointf(10.0f, 20.0f);
+	graphics.DrawString(L"HelloGDI+", -1, &font, pointf, &brush);
+
+	//line
+	Pen pen(Color(120, 0, 255, 255));
+	graphics.DrawLine(&pen, 0, 0, 200, 100);
+
+	//image
+	Image img((WCHAR *)L"images/sigong.png");
+	int w = img.GetWidth();
+	int h = img.GetHeight();
+	graphics.DrawImage(&img, 100, 100, w, h);
+
+	//image rotation
+	Image *pImage = nullptr;
+	pImage = Image::FromFile((WCHAR *)L"images/sigong.png");
+
+	Gdiplus::Matrix mat;
+	static int rot = 0;
+	int xpos = 200;
+	int ypos = 100;
+
+	rot += 15;
+	mat.RotateAt(rot % 360,
+		Gdiplus::PointF(xpos + (float)w/2,
+		ypos + (float)(h / 2)));
+	graphics.SetTransform(&mat);
+	graphics.DrawImage(pImage, 200, 100, w, h);
+
+	//
+	ImageAttributes imgAttr;
+	imgAttr.SetColorKey(Color(240, 0, 240), (Color(255, 10, 255)));
+
+	mat.RotateAt(-(rot % 360),
+		Gdiplus::PointF(xpos + (float)w / 2,
+			ypos + (float)(h / 2)));
+	graphics.SetTransform(&mat);
+	rot += 15;
+	xpos = 300;
+
+	graphics.DrawImage(pImage,
+		Rect(xpos - (float)w / 2, ypos - (float)h / 2, w, h),
+		0, 0, w, h,
+		UnitPixel, &imgAttr);
+
+	//
+	brush.SetColor(Color(128, 255, 0, 0));
+	graphics.FillRectangle(&brush, 400, 250, 200, 300);
+
+	//
+
+
+	static REAL transparency;
+	transparency += 0.1f;
+	if (transparency > 1.0f)
+		transparency = 0.0f;
+	ColorMatrix colorMatrix =
+	{
+		1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, transparency, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	imgAttr.SetColorMatrix(&colorMatrix);
+	xpos = 400;
+	graphics.DrawImage(pImage,
+		Rect(xpos - (float)w / 2, ypos - (float)h / 2, w, h),
+		0, 0, w, h,
+		UnitPixel, &imgAttr);
+
+	//
+	colorMatrix =
+	{
+		0.3f, 0.3f, 0.3f, 0.0f, 0.0f,
+		0.6f, 0.6f, 0.6f, 0.0f, 0.0f,
+		0.1f, 0.1f, 0.1f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	imgAttr.SetColorMatrix(&colorMatrix);
+	xpos = 500;
+	graphics.DrawImage(pImage,
+		Rect(xpos - (float)w / 2, ypos - (float)h / 2, w, h),
+		0, 0, w, h,
+		UnitPixel, &imgAttr);
+
+	if (pImage) delete pImage;
+
+}
+void GDI_End()
+{
+	GdiplusShutdown(g_GdiToken);
+}
