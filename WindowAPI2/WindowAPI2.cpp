@@ -247,11 +247,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
-//			DrawBitmap(hWnd, hdc);
+			DrawBitmap(hWnd, hdc);
 //			DrawTransBitmap(hWnd, hdc);
 //			DrawAnimation(hWnd, hdc);
 //			DrawRectText(hdc);
-			DrawBitmapDoubleBuffering(hWnd, hdc);
+//			DrawBitmapDoubleBuffering(hWnd, hdc);
 
 
             EndPaint(hWnd, &ps);
@@ -406,7 +406,7 @@ void DrawBitmapDoubleBuffering(HWND hWnd, HDC hdc)
 	HDC hMemDC2;
 	HBITMAP hOldBitmap2;
 
-	hMemDC = CreateCompatibleDC(hdc);
+	hMemDC = CreateCompatibleDC(hdc); // hdc와 호환가능한 새로운 DC생성
 
 	if (!hMemDC)
 	{
