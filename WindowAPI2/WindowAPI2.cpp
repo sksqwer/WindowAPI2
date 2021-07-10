@@ -71,7 +71,10 @@ void GDI_Draw(HDC hdc);
 void OnGDI_Paint(HDC hdc);
 void GDI_End();
 
-
+// Dialog
+BOOL CALLBACK MyDlg_Proc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+BOOL CALLBACK MyDlg_Proc2(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+static HWND hModallessDlg;
 // 이 코드 모듈에 포함된 함수의 선언을 전달합니다:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -86,6 +89,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	// TODO: 여기에 코드를 입력합니다.
+	HACCEL hAcc;
+	hAcc = LoadAccelerators(hInstance, MAKEINTRESOURCE(ID_FUNC1));
 
 	// 전역 문자열을 초기화합니다.
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -229,14 +234,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-			case ID_FUNC1:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 				break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
+			case ID_FUNC1:
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG), hWnd, MyDlg_Proc);
+				break;
+			case ID_FUNC2:
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG2), hWnd, MyDlg_Proc2);
+
+				//if (!IsWindow(hModallessDlg))
+				//{
+				//	hModallessDlg = CreateDialog(hInst, MAKEINTRESOURCE(IDD_MYDIALOG2), hWnd, MyDlg_Proc2);
+				//	ShowWindow(hModallessDlg, SW_SHOW);
+				//}
+				break;
+			case IDM_EXIT:
+				DestroyWindow(hWnd);
+				break;
+			default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
@@ -458,7 +472,6 @@ void DrawBitmapDoubleBuffering(HWND hWnd, HDC hdc)
 		bx = SPRITE_SIZE_X;
 		by = SPRITE_SIZE_Y;
 
-
 		TransparentBlt(hMemDC, AniPos.x, AniPos.y, bx * 3, by * 3, hMemDC2, (curframe + xStart) * bx, yStart * by, bx, by, RGB(255, 255, 255));
 
 		SelectObject(hMemDC2, hOldBitmap2);
@@ -466,7 +479,6 @@ void DrawBitmapDoubleBuffering(HWND hWnd, HDC hdc)
 	}
 	//GDI
 	GDI_Draw(hMemDC);
-
 
 	//
 	BitBlt(hdc, 0, 0, rectView.right, rectView.bottom,
@@ -648,4 +660,138 @@ void OnGDI_Paint(HDC hdc)
 void GDI_End()
 {
 	GdiplusShutdown(g_GdiToken);
+}
+
+BOOL CALLBACK MyDlg_Proc(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+{
+	static int Check[3], Radio;
+	TCHAR hobby[][30] = { _T("독서"), _T("음악감상"), _T("웹서핑") };
+	TCHAR sex[][30] = { _T("여자"), _T("남자") };
+	TCHAR output[128];
+
+	switch (iMsg)
+	{
+	case WM_INITDIALOG:
+	{
+//		HWND hWndBtn = GetDlgitem(hDlg, IDC_PAUSE_BTN);
+//		EnableWindow()
+		return 1;
+	}
+	break;
+	case WM_COMMAND:
+	{
+		
+		TCHAR text[128];
+
+		switch (LOWORD(wParam))
+		{
+		case IDC_CHECK_READING:
+			Check[0] = 1 - Check[0];
+			break;
+		case IDC_CHECK_MUSIC:
+			Check[1] = 1 - Check[1];
+			break;
+		case IDC_CHECK_WEB:
+			Check[2] = 1 - Check[2];
+			break;
+		case IDC_RADIO_MALE:
+			Radio = 1;
+			break;
+		case IDC_RADIO_FEMALE:
+			Radio = 0;
+			break;
+
+		case IDC_BUTTON_OUTPUT:
+			_stprintf_s(output, _T("선택한 취미는 %s %s %s 입니다.\r\n")
+				_T("선택한 성별은 %s 입니다."),
+				Check[0] ? hobby[0] : _T(""),
+				Check[1] ? hobby[1] : _T(""),
+				Check[2] ? hobby[2] : _T(""),
+				sex[Radio]);
+			SetDlgItemText(hDlg, IDC_EDIT_OP, output);
+
+			break;
+		case IDC_START_BTN:
+			SetDlgItemText(hDlg, IDC_MYDLG_STATIC, _T("시작"));
+			{
+				HWND hWndBtn = GetDlgItem(hDlg, IDC_START_BTN);
+				EnableWindow(hWndBtn, false);
+
+				hWndBtn = GetDlgItem(hDlg, IDC_PAUSE_BTN);
+
+				EnableWindow(hWndBtn, true);
+			}
+			break;
+		case IDC_PAUSE_BTN:
+			SetDlgItemText(hDlg, IDC_MYDLG_STATIC, _T("정지"));
+			{
+				HWND hWndBtn = GetDlgItem(hDlg, IDC_START_BTN);
+				EnableWindow(hWndBtn, true);
+
+				hWndBtn = GetDlgItem(hDlg, IDC_PAUSE_BTN);
+				EnableWindow(hWndBtn, false);
+			}
+			break;
+		case IDC_BUTTON_COPY:
+
+			GetDlgItemText(hDlg, IDC_INPUT_EDIT, text, 128);
+			SetDlgItemText(hDlg, IDC_OUTPUT_EDIT, text);
+			break;
+		case IDC_BUTTON_DELETE:
+			text[0] = NULL;
+			SetDlgItemText(hDlg, IDC_OUTPUT_EDIT, text);
+			break;
+		case IDC_EXIT_BTN:
+			EndDialog(hDlg, 0);
+			break;
+
+		}
+	}
+	break;
+	}
+
+
+	return 0;
+}
+
+
+BOOL CALLBACK MyDlg_Proc2(HWND hDlg, UINT iMsg, WPARAM wParam, LPARAM lParam)
+{
+	static HWND hcombo;
+	static int selection;
+	TCHAR name[20];
+
+
+	switch (iMsg)
+	{
+	case WM_INITDIALOG:
+		hcombo = GetDlgItem(hDlg, IDC_COMBO_LIST);
+		return 1;
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDC_BUTTON_INSERT:
+			GetDlgItemText(hDlg, IDC_EDIT_NAME, name, 20);
+			if (_tcscmp(name, _T("")))
+				SendMessage(hcombo, CB_ADDSTRING, 0, (LPARAM)name);
+				return 0;
+				break;
+		case IDC_BUTTON_DELETE:
+			SendMessage(hcombo, CB_DELETESTRING, selection, 0);
+			return 0;
+		case IDC_COMBO_LIST:
+			if (HIWORD(wParam) == CBN_SELCHANGE)
+				selection = SendMessage(hcombo, CB_GETCURSEL, 0, 0);
+			break;
+		case IDCLOSE:
+			EndDialog(hDlg, 0);
+			return 0;
+		case IDCANCEL:
+			EndDialog(hDlg, 0);
+			return 0;
+
+		}
+		break;
+	}
+	return 0;
 }
