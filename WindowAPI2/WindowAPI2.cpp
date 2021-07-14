@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "WindowAPI2.h"
+#include <tchar.h>
 
 //c++ header
 #include <ObjIdl.h>
@@ -19,7 +20,16 @@ using namespace Gdiplus;
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
 WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름입니다.
+//HWND HC1, HC2;
 
+ATOM MyRegisterClass(HINSTANCE hInstance);
+BOOL InitInstance(HINSTANCE, int);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK ChildWndProc1(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK ChildWndProc2(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK About(HWND, UINT, WPARAM, LPARAM);
+
+HWND ChildWnd[2];
 // >> : image
 POINT AniPos = { 0,0 };
 HBITMAP hBackImage;
@@ -161,8 +171,21 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_WINDOWAPI2);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	RegisterClassExW(&wcex);
 
-    return RegisterClassExW(&wcex);
+	//child1 
+	wcex.lpfnWndProc = ChildWndProc1;
+	wcex.lpszMenuName = NULL;
+	wcex.lpszClassName = _T("Child top");
+	RegisterClassExW(&wcex);
+
+	//child2
+	wcex.lpfnWndProc = ChildWndProc2;
+	wcex.lpszMenuName = NULL;
+	wcex.lpszClassName = _T("Child bottom");
+	RegisterClassExW(&wcex);
+
+    return NULL;
 }
 
 //
@@ -206,8 +229,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static BOOL bselectd = false;
-
-
 	// >>  : image
 
     switch (message)
@@ -215,9 +236,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 	{
 		GetClientRect(hWnd, &rectView);
-		CreateBitmap();
+//		CreateBitmap();
+		ChildWnd[0] = CreateWindowEx(WS_EX_CLIENTEDGE, _T("Child top"), NULL, WS_CHILD | WS_VISIBLE, 0, 0, rectView.right, rectView.bottom / 2.0 - 1,
+			hWnd, NULL, hInst, NULL);
+
+		ChildWnd[1] = CreateWindowEx(WS_EX_CLIENTEDGE, _T("Child bottom"), NULL, WS_CHILD | WS_VISIBLE, 0, rectView.bottom / 2.0 + 1, rectView.right, rectView.bottom / 2.0 - 1,
+			hWnd, NULL, hInst, NULL);
+/*
+		MoveWindow(HC1, 0, 0, rectView.right, rectView.bottom / 2 - 1, TRUE);
+		MoveWindow(HC2, 0, rectView.bottom / 2 + 1, rectView.right, rectView.bottom / 2 - 1, TRUE);*/
 	//	SetTimer(hWnd, 123, 100, NULL);
-		SetTimer(hWnd, 123, 1, AniProc);
+//		SetTimer(hWnd, 123, 1, AniProc);
 	}
 		break;
 	case WM_TIMER:
@@ -235,11 +264,60 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 				break;
+			case ID_FILE_READ:
+			{
+				HANDLE hFile;
+				TCHAR InBuff[1000];
+				DWORD size;
+
+				hFile = CreateFile(_T("test1.txt"),
+					GENERIC_READ,
+					FILE_SHARE_READ,
+					NULL, OPEN_EXISTING, 0, 0);
+
+				memset(InBuff, 0, sizeof(InBuff));
+				ReadFile(hFile, InBuff, 999 * sizeof(TCHAR), &size, NULL);
+				HDC hdc = GetDC(ChildWnd[0]);
+				RECT rt;
+				GetClientRect(ChildWnd[0], &rt);
+				DrawText(hdc, InBuff, (int)_tcslen(InBuff), &rt, DT_TOP | DT_LEFT);
+				ReleaseDC(ChildWnd[0], hdc);
+
+				CloseHandle(hFile);
+			}
+				break;
+			case ID_FILE_WRITE:
+			{
+				HANDLE hFile;
+					TCHAR InBuff[1000];
+					TCHAR OutBuff[100] = _T( "API Programming Test" );
+					DWORD size;
+
+					hFile = CreateFile(_T("test1.txt"),
+						GENERIC_READ | GENERIC_WRITE,
+						FILE_SHARE_READ | FILE_SHARE_WRITE,
+						NULL, OPEN_EXISTING, 0, 0);
+
+					memset(InBuff, 0, sizeof(InBuff));
+					ReadFile(hFile, InBuff, 999 * sizeof(TCHAR), &size, NULL);
+					HDC hdc = GetDC(ChildWnd[1]);
+					RECT rt;
+					GetClientRect(ChildWnd[1], &rt);
+					DrawText(hdc, InBuff, (int)_tcslen(InBuff), &rt, DT_TOP | DT_LEFT);
+					ReleaseDC(ChildWnd[1], hdc);
+
+					WriteFile(hFile, OutBuff, (DWORD)_tcslen(OutBuff) * sizeof(TCHAR), &size, NULL);
+					CloseHandle(hFile);
+			}
+				break;
 			case ID_FUNC1:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG), hWnd, MyDlg_Proc);
+			{
+
+			}
+//				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG), hWnd, MyDlg_Proc);
 				break;
 			case ID_FUNC2:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG2), hWnd, MyDlg_Proc2);
+//				DialogBox(hInst, MAKEINTRESOURCE(IDD_MYDIALOG2), hWnd, MyDlg_Proc2);
 
 				//if (!IsWindow(hModallessDlg))
 				//{
@@ -255,13 +333,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
         }
         break;
+		//case WM_LBUTTONDOWN:
+		//{
+		//	HANDLE hFile;
+		//	TCHAR InBuff[1000];
+		//	TCHAR OutBuff[100] = _T( "API Programming Test" );
+		//	DWORD size;
+
+		//	hFile = CreateFile(_T("test1.txt"),
+		//		GENERIC_READ | GENERIC_WRITE,
+		//		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		//		NULL, OPEN_EXISTING, 0, 0);
+
+		//	memset(InBuff, 0, sizeof(InBuff));
+		//	ReadFile(hFile, InBuff, 999 * sizeof(TCHAR), &size, NULL);
+		//	HDC hdc = GetDC(hWnd);
+		//	RECT rt;
+		//	GetClientRect(hWnd, &rt);
+		//	DrawText(hdc, InBuff, (int)_tcslen(InBuff), &rt, DT_TOP | DT_LEFT);
+		//	ReleaseDC(hWnd, hdc);
+
+		//	WriteFile(hFile, OutBuff, (DWORD)_tcslen(OutBuff) * sizeof(TCHAR), &size, NULL);
+		//	CloseHandle(hFile);
+		//}
+		//	break;
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
 
-			DrawBitmap(hWnd, hdc);
+//			DrawBitmap(hWnd, hdc);
 //			DrawTransBitmap(hWnd, hdc);
 //			DrawAnimation(hWnd, hdc);
 //			DrawRectText(hdc);
@@ -272,8 +374,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
-		DeleteBitmap();
-		KillTimer(hWnd, 123);
+//		DeleteBitmap();
+//		KillTimer(hWnd, 123);
         PostQuitMessage(0);
         break;
     default:
@@ -302,6 +404,30 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+LRESULT ChildWndProc1(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_CREATE:
+	{
+	}
+	break;
+	}
+
+	return DefWindowProc(hWnd, message , wParam, lParam);
+}
+LRESULT ChildWndProc2(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch (message)
+	{
+	case WM_CREATE:
+	{
+	}
+	break;
+	}
+
+	return DefWindowProc(hWnd, message, wParam, lParam);
 }
 void CreateBitmap()
 {
